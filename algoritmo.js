@@ -1,59 +1,64 @@
 const fs = require('fs');
 const parse = require('csv-parse/lib/sync');
 
-// Lendo a planilha de avaliações e calculando as médias ponderadas
-const rawData = fs.readFileSync('planilha.csv', 'utf8');
-const data = parse(rawData, { columns: true });
-
-const pesos = [0.1, 0.15, 0.15, 0.15, 0.1, 0.15, 0.2]; // pesos dos critérios
-const projetos = {}; // objeto para armazenar as médias por projeto
-
-data.forEach(avaliacao => {
-    const projetoId = avaliacao['Id do Projeto'];
-    const notas = [parseFloat(avaliacao['n1']), parseFloat(avaliacao['n2']), parseFloat(avaliacao['n3']),
-                   parseFloat(avaliacao['n4']), parseFloat(avaliacao['n5']), parseFloat(avaliacao['n6']),
-                   parseFloat(avaliacao['n7'])];
-    const media = notas.reduce((total, nota, index) => total + nota * pesos[index], 0) / pesos.reduce((total, peso) => total + peso, 0);
-
-    if (!projetos[projetoId]) {
-        projetos[projetoId] = [];
-    }
-    projetos[projetoId].push(media);
+// Passo 1: Ler a planilha CSV com os critérios e pesos
+const criteriosCsv = fs.readFileSync('criterios&pesos.csv', 'utf8');
+const criteriosData = parse(criteriosCsv, {
+  columns: true,
+  skip_empty_lines: true
 });
 
-// Gerando a matriz de médias
-const matrizMedias = [];
-for (const projetoId in projetos) {
-    matrizMedias.push([projetoId, ...projetos[projetoId]]);
+// Extrair critérios e pesos para um objeto
+const criterios = {};
+for (const row of criteriosData) {
+  criterios[row.Critério] = parseFloat(row.Peso);
 }
 
-// Aplicando o método de Copeland
-const matrizDecisao = [];
-for (let i = 0; i < matrizMedias.length; i++) {
-    const linha = [];
-    for (let j = 0; j < matrizMedias.length; j++) {
-        let pontos = 0;
-        for (let k = 1; k <= 7; k++) { // comparar critérios 1 a 7
-            if (matrizMedias[i][k] > matrizMedias[j][k]) {
-                pontos++;
-            } else if (matrizMedias[i][k] < matrizMedias[j][k]) {
-                pontos--;
-            }
+// Passo 2: Ler a planilha CSV com os dados dos projetos e notas
+const projetosCsv = fs.readFileSync('projetos&notas.csv', 'utf8');
+const projetosData = parse(projetosCsv, {
+  columns: true,
+  skip_empty_lines: true
+});
+
+// Passo 3: Calcular as médias ponderadas dos projetos
+const mediasPonderadas = projetosData.map(projeto => {
+  const notas = Object.keys(projeto)
+    .filter(key => key.startsWith('n')) // aqui seleciona apenas as colunas de notas (n1, n2, ..., n7)
+    .map(key => parseFloat(projeto[key]));
+  
+  const idProjeto = projeto['ID Projeto'];
+  
+  const media = notas.reduce((acc, nota, index) => {
+    return acc + nota * criterios[`Critério ${index + 1}`];
+  }, 0);
+  
+  return [idProjeto, media];
+});
+
+// Função para calcular a matriz de Copeland a partir das médias ponderadas
+function calcularMatrizCopeland(mediasPonderadas) {
+  const numProjetos = mediasPonderadas.length;
+  const matrizCopeland = new Array(numProjetos).fill(0).map(() => new Array(numProjetos).fill(0));
+
+  for (let i = 0; i < numProjetos; i++) {
+    for (let j = i + 1; j < numProjetos; j++) {
+      // Comparar os projetos i e j em relação a cada critério
+      for (let k = 1; k < mediasPonderadas[i].length; k++) { // Começando de 1, pois o ID do projeto está na primeira coluna
+        if (mediasPonderadas[i][k] > mediasPonderadas[j][k]) {
+          matrizCopeland[i][j]++;
+        } else if (mediasPonderadas[i][k] < mediasPonderadas[j][k]) {
+          matrizCopeland[j][i]++;
         }
-        linha.push(pontos);
+      }
     }
-    matrizDecisao.push(linha);
+  }
+
+  return matrizCopeland;
 }
 
-// Somando os pontos para classificação final
-const pontosFinais = matrizDecisao.map(linha => linha.reduce((total, pontos) => total + pontos, 0));
+// Aqui, chamamos a função para calcular a matriz de Copeland a partir das médias ponderadas.
+const matrizCopeland = calcularMatrizCopeland(mediasPonderadas);
+// Agora, 'matrizCopeland' contém a matriz de Copeland.
 
-// Ordenando os projetos por pontos finais
-const projetosOrdenados = matrizMedias.map((projeto, index) => [projeto[0], pontosFinais[index]])
-                                      .sort((a, b) => b[1] - a[1]);
-
-// Imprimindo a classificação final
-console.log('Classificação final dos projetos:');
-projetosOrdenados.forEach((projeto, index) => {
-    console.log(`${index + 1}. Projeto ${projeto[0]} - Pontos: ${projeto[1]}`);
-});
+//prosseguir com análises adicionais
