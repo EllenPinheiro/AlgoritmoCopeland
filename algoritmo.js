@@ -1,8 +1,8 @@
 const fs = require('fs');
-const parse = require('csv-parse/lib/sync');
+const parse = require('csv-parse');
 
 // Passo 1: Ler a planilha CSV com os critérios e pesos
-const criteriosCsv = fs.readFileSync('criterios&pesos.csv', 'utf8');
+const criteriosCsv = fs.readFileSync('criterios-pesos.csv', 'utf8');
 const criteriosData = parse(criteriosCsv, {
   columns: true,
   skip_empty_lines: true
@@ -15,7 +15,7 @@ for (const row of criteriosData) {
 }
 
 // Passo 2: Ler a planilha CSV com os dados dos projetos e notas
-const projetosCsv = fs.readFileSync('projetos&notas.csv', 'utf8');
+const projetosCsv = fs.readFileSync('projetos-notas.csv', 'utf8');
 const projetosData = parse(projetosCsv, {
   columns: true,
   skip_empty_lines: true
