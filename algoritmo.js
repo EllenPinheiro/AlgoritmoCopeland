@@ -2,7 +2,7 @@ const fs = require('fs');
 const parse = require('csv-parse');
 
 // Passo 1: Ler a planilha CSV com os critérios e pesos
-const criteriosCsv = fs.readFileSync('criterios-pesos.csv', 'utf8');
+const criteriosCsv = fs.createReadStream('criterios-pesos.csv', 'utf8');
 const criteriosData = parse(criteriosCsv, {
   columns: true,
   skip_empty_lines: true
